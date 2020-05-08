@@ -32,10 +32,10 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 
         mainActivity = (MainActivity)getActivity();
-        Context context = getPreferenceManager().getContext();
+        final Context context = getPreferenceManager().getContext();
 
         PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(context);
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         // Rename device
         renameDevice = new EditTextPreference(context);
@@ -48,23 +48,26 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         renameDevice.setText(deviceName);
         renameDevice.setPositiveButtonText(R.string.device_rename_confirm);
         renameDevice.setNegativeButtonText(R.string.cancel);
-        renameDevice.setOnPreferenceChangeListener((preference, newValue) -> {
-            String name = (String) newValue;
+        renameDevice.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                String name = (String) newValue;
 
-            if (TextUtils.isEmpty(name)) {
-                if (getView() != null) {
-                    Snackbar snackbar = Snackbar.make(getView(), R.string.invalid_device_name, Snackbar.LENGTH_LONG);
-                    if (!prefs.getBoolean("darkTheme", false)) {
-                        // white color is set to the background of snackbar if dark mode is off
-                        snackbar.getView().setBackgroundColor(Color.WHITE);
+                if (TextUtils.isEmpty(name)) {
+                    if (SettingsFragment.this.getView() != null) {
+                        Snackbar snackbar = Snackbar.make(SettingsFragment.this.getView(), R.string.invalid_device_name, Snackbar.LENGTH_LONG);
+                        if (!prefs.getBoolean("darkTheme", false)) {
+                            // white color is set to the background of snackbar if dark mode is off
+                            snackbar.getView().setBackgroundColor(Color.WHITE);
+                        }
+                        snackbar.show();
                     }
-                    snackbar.show();
+                    return false;
                 }
-                return false;
-            }
 
-            renameDevice.setSummary((String)newValue);
-            return true;
+                renameDevice.setSummary((String) newValue);
+                return true;
+            }
         });
 
         screen.addPreference(renameDevice);
@@ -74,8 +77,10 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         darkThemeSwitch.setPersistent(false);
         darkThemeSwitch.setChecked(ThemeUtil.shouldUseDarkTheme(context));
         darkThemeSwitch.setTitle(R.string.settings_dark_mode);
-        darkThemeSwitch.setOnPreferenceChangeListener((preference, newValue) -> {
-                boolean isChecked = (Boolean)newValue;
+        darkThemeSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                boolean isChecked = (Boolean) newValue;
                 boolean isDarkAlready = prefs.getBoolean("darkTheme", false);
                 if (isDarkAlready != isChecked) {
                     prefs.edit().putBoolean("darkTheme", isChecked).apply();
@@ -84,6 +89,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
                     }
                 }
                 return true;
+            }
         });
         screen.addPreference(darkThemeSwitch);
 
@@ -93,12 +99,15 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             persistentNotif.setTitle(R.string.setting_persistent_notification_oreo);
             persistentNotif.setSummary(R.string.setting_persistent_notification_description);
 
-            persistentNotif.setOnPreferenceClickListener(preference -> {
-                Intent intent = new Intent();
-                intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
-                intent.putExtra("android.provider.extra.APP_PACKAGE", context.getPackageName());
-                context.startActivity(intent);
-                return true;
+            persistentNotif.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    Intent intent = new Intent();
+                    intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
+                    intent.putExtra("android.provider.extra.APP_PACKAGE", context.getPackageName());
+                    context.startActivity(intent);
+                    return true;
+                }
             });
             screen.addPreference(persistentNotif);
         } else {
@@ -107,17 +116,25 @@ public class SettingsFragment extends PreferenceFragmentCompat {
             notificationSwitch.setPersistent(false);
             notificationSwitch.setChecked(NotificationHelper.isPersistentNotificationEnabled(context));
             notificationSwitch.setTitle(R.string.setting_persistent_notification);
-            notificationSwitch.setOnPreferenceChangeListener((preference, newValue) -> {
+            notificationSwitch.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                @Override
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
 
-                final boolean isChecked = (Boolean) newValue;
+                    final boolean isChecked = (Boolean) newValue;
 
-                NotificationHelper.setPersistentNotificationEnabled(context, isChecked);
-                BackgroundService.RunCommand(context,
-                        service -> service.changePersistentNotificationVisibility(isChecked));
+                    NotificationHelper.setPersistentNotificationEnabled(context, isChecked);
+                    BackgroundService.RunCommand(context,
+                            new BackgroundService.InstanceCallback() {
+                                @Override
+                                public void onServiceStart(BackgroundService service) {
+                                    service.changePersistentNotificationVisibility(isChecked);
+                                }
+                            });
 
-                NotificationHelper.setPersistentNotificationEnabled(context, isChecked);
+                    NotificationHelper.setPersistentNotificationEnabled(context, isChecked);
 
-                return true;
+                    return true;
+                }
             });
             screen.addPreference(notificationSwitch);
         }
@@ -129,9 +146,12 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         trustedNetworkPref.setTitle(R.string.trusted_networks);
         trustedNetworkPref.setSummary(R.string.trusted_networks_desc);
         screen.addPreference(trustedNetworkPref);
-        trustedNetworkPref.setOnPreferenceClickListener(preference -> {
-            startActivity(new Intent(context, TrustedNetworksActivity.class));
-            return true;
+        trustedNetworkPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                SettingsFragment.this.startActivity(new Intent(context, TrustedNetworksActivity.class));
+                return true;
+            }
         });
 
         // Add device by IP
@@ -139,10 +159,13 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         devicesByIpPreference.setPersistent(false);
         devicesByIpPreference.setTitle(R.string.custom_device_list);
         screen.addPreference(devicesByIpPreference);
-        devicesByIpPreference.setOnPreferenceClickListener(preference -> {
+        devicesByIpPreference.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
 
-            startActivity(new Intent(context, CustomDevicesActivity.class));
-            return true;
+                SettingsFragment.this.startActivity(new Intent(context, CustomDevicesActivity.class));
+                return true;
+            }
         });
 
 

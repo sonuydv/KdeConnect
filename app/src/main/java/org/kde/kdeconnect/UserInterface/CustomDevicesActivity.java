@@ -182,12 +182,15 @@ public class CustomDevicesActivity extends AppCompatActivity implements CustomDe
         showEmptyListMessageIfRequired();
 
         Snackbar.make(recyclerView, R.string.custom_device_deleted, Snackbar.LENGTH_LONG)
-                .setAction(R.string.undo, v -> {
-                    customDeviceList.add(lastDeletedCustomDevice.position, lastDeletedCustomDevice.hostnameOrIP);
-                    customDevicesAdapter.notifyItemInserted(lastDeletedCustomDevice.position);
-                    lastDeletedCustomDevice = null;
-                    saveList();
-                    showEmptyListMessageIfRequired();
+                .setAction(R.string.undo, new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        customDeviceList.add(lastDeletedCustomDevice.position, lastDeletedCustomDevice.hostnameOrIP);
+                        customDevicesAdapter.notifyItemInserted(lastDeletedCustomDevice.position);
+                        lastDeletedCustomDevice = null;
+                        CustomDevicesActivity.this.saveList();
+                        CustomDevicesActivity.this.showEmptyListMessageIfRequired();
+                    }
                 })
                 .addCallback(new BaseTransientBottomBar.BaseCallback<Snackbar>() {
                     @Override

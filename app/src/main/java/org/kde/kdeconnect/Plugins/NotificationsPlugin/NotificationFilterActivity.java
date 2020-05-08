@@ -21,6 +21,7 @@
 package org.kde.kdeconnect.Plugins.NotificationsPlugin;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
@@ -32,10 +33,12 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.CheckBox;
 import android.widget.CheckedTextView;
+import android.widget.CompoundButton;
 import android.widget.ListView;
 
 import org.kde.kdeconnect.BackgroundService;
@@ -43,6 +46,7 @@ import org.kde.kdeconnect.R;
 import org.kde.kdeconnect.UserInterface.ThemeUtil;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 import androidx.appcompat.app.AlertDialog;
@@ -108,25 +112,39 @@ public class NotificationFilterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_notification_filter);
         appDatabase = new AppDatabase(NotificationFilterActivity.this, false);
 
-        new Thread(() -> {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
 
-            PackageManager packageManager = getPackageManager();
-            List<ApplicationInfo> appList = packageManager.getInstalledApplications(0);
-            int count = appList.size();
+                PackageManager packageManager = NotificationFilterActivity.this.getPackageManager();
+                List<ApplicationInfo> appList = packageManager.getInstalledApplications(0);
+                int count = appList.size();
 
-            apps = new AppListInfo[count];
-            for (int i = 0; i < count; i++) {
-                ApplicationInfo appInfo = appList.get(i);
-                apps[i] = new AppListInfo();
-                apps[i].pkg = appInfo.packageName;
-                apps[i].name = appInfo.loadLabel(packageManager).toString();
-                apps[i].icon = resizeIcon(appInfo.loadIcon(packageManager), 48);
-                apps[i].isEnabled = appDatabase.isEnabled(appInfo.packageName);
+                apps = new AppListInfo[count];
+                for (int i = 0; i < count; i++) {
+                    ApplicationInfo appInfo = appList.get(i);
+                    apps[i] = new AppListInfo();
+                    apps[i].pkg = appInfo.packageName;
+                    apps[i].name = appInfo.loadLabel(packageManager).toString();
+                    apps[i].icon = NotificationFilterActivity.this.resizeIcon(appInfo.loadIcon(packageManager), 48);
+                    apps[i].isEnabled = appDatabase.isEnabled(appInfo.packageName);
+                }
+
+                Arrays.sort(apps, new Comparator<AppListInfo>() {
+                    @Override
+                    public int compare(AppListInfo lhs, AppListInfo rhs) {
+                        return lhs.name.compareToIgnoreCase(rhs.name);
+                    }
+                });
+
+//                NotificationFilterActivity.this.runOnUiThread(() -> NotificationFilterActivity.this.displayAppList());
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        displayAppList();
+                    }
+                });
             }
-
-            Arrays.sort(apps, (lhs, rhs) -> lhs.name.compareToIgnoreCase(rhs.name));
-
-            runOnUiThread(this::displayAppList);
         }).start();
 
     }
@@ -138,74 +156,96 @@ public class NotificationFilterActivity extends AppCompatActivity {
         listView.setAdapter(adapter);
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
         listView.setLongClickable(true);
-        listView.setOnItemClickListener((adapterView, view, i, l) -> {
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
-            if (i == 0) {
+                if (i == 0) {
 
-                boolean enabled = listView.isItemChecked(0);
-                for (int j = 0; j < apps.length; j++) {
-                    listView.setItemChecked(j, enabled);
+                    boolean enabled = listView.isItemChecked(0);
+                    for (int j = 0; j < apps.length; j++) {
+                        listView.setItemChecked(j, enabled);
+                    }
+                    appDatabase.setAllEnabled(enabled);
+                } else {
+                    boolean checked = listView.isItemChecked(i);
+                    appDatabase.setEnabled(apps[i - 1].pkg, checked);
+                    apps[i - 1].isEnabled = checked;
                 }
-                appDatabase.setAllEnabled(enabled);
-            } else {
-                boolean checked = listView.isItemChecked(i);
-                appDatabase.setEnabled(apps[i - 1].pkg, checked);
-                apps[i - 1].isEnabled = checked;
             }
         });
-        listView.setOnItemLongClickListener((adapterView, view, i, l) -> {
-            if(i == 0)
+        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> adapterView, View view, final int i, long l) {
+                if (i == 0)
+                    return true;
+                final Context context = NotificationFilterActivity.this;
+                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                View mView = NotificationFilterActivity.this.getLayoutInflater().inflate(R.layout.popup_notificationsfilter, null);
+                builder.setMessage(context.getResources().getString(R.string.extra_options));
+
+                ListView lv = mView.findViewById(R.id.extra_options_list);
+                final String[] options = new String[]{
+                        context.getResources().getString(R.string.privacy_options)
+                };
+                ArrayAdapter<String> extra_options_adapter = new ArrayAdapter<>(NotificationFilterActivity.this,
+                        android.R.layout.simple_list_item_1, options);
+                lv.setAdapter(extra_options_adapter);
+                builder.setView(mView);
+
+                final AlertDialog ad = builder.create();
+
+                lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> new_adapterView, View new_view, int new_i, long new_l) {
+                        switch (new_i) {
+                            case 0:
+                                AlertDialog.Builder myBuilder = new AlertDialog.Builder(context);
+                                final String packageName = apps[i - 1].pkg;
+
+                                View myView = NotificationFilterActivity.this.getLayoutInflater().inflate(R.layout.privacy_options, null);
+                                CheckBox checkbox_contents = myView.findViewById(R.id.checkbox_contents);
+                                checkbox_contents.setChecked(appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS));
+                                checkbox_contents.setText(context.getResources().getString(R.string.block_contents));
+                                CheckBox checkbox_images = myView.findViewById(R.id.checkbox_images);
+                                checkbox_images.setChecked(appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES));
+                                checkbox_images.setText(context.getResources().getString(R.string.block_images));
+
+                                myBuilder.setView(myView);
+                                myBuilder.setTitle(context.getResources().getString(R.string.privacy_options));
+                                myBuilder.setPositiveButton(context.getResources().getString(R.string.ok), new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int id) {
+                                        dialog.dismiss();
+                                    }
+                                });
+                                myBuilder.setMessage(context.getResources().getString(R.string.set_privacy_options));
+
+                                checkbox_contents.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                                    @Override
+                                    public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                                        appDatabase.setPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS,
+                                                compoundButton.isChecked());
+                                    }
+                                });
+                                checkbox_images.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                                    @Override
+                                    public void onCheckedChanged(CompoundButton compoundButton, boolean b) {
+                                        appDatabase.setPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES,
+                                                compoundButton.isChecked());
+                                    }
+                                });
+
+                                ad.cancel();
+                                myBuilder.show();
+                                break;
+                        }
+                    }
+                });
+
+                ad.show();
                 return true;
-            Context context = this;
-            AlertDialog.Builder builder = new AlertDialog.Builder(context);
-            View mView = getLayoutInflater().inflate(R.layout.popup_notificationsfilter, null);
-            builder.setMessage(context.getResources().getString(R.string.extra_options));
-
-            ListView lv = mView.findViewById(R.id.extra_options_list);
-            final String[] options = new String[] {
-                    context.getResources().getString(R.string.privacy_options)
-            };
-            ArrayAdapter<String> extra_options_adapter = new ArrayAdapter<>(this,
-                    android.R.layout.simple_list_item_1, options);
-            lv.setAdapter(extra_options_adapter);
-            builder.setView(mView);
-
-            AlertDialog ad = builder.create();
-
-            lv.setOnItemClickListener((new_adapterView, new_view, new_i, new_l) -> {
-                switch (new_i){
-                    case 0:
-                        AlertDialog.Builder myBuilder = new AlertDialog.Builder(context);
-                        String packageName = apps[i - 1].pkg;
-
-                        View myView = getLayoutInflater().inflate(R.layout.privacy_options, null);
-                        CheckBox checkbox_contents = myView.findViewById(R.id.checkbox_contents);
-                        checkbox_contents.setChecked(appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS));
-                        checkbox_contents.setText(context.getResources().getString(R.string.block_contents));
-                        CheckBox checkbox_images = myView.findViewById(R.id.checkbox_images);
-                        checkbox_images.setChecked(appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES));
-                        checkbox_images.setText(context.getResources().getString(R.string.block_images));
-
-                        myBuilder.setView(myView);
-                        myBuilder.setTitle(context.getResources().getString(R.string.privacy_options));
-                        myBuilder.setPositiveButton(context.getResources().getString(R.string.ok), (dialog, id) -> dialog.dismiss());
-                        myBuilder.setMessage(context.getResources().getString(R.string.set_privacy_options));
-
-                        checkbox_contents.setOnCheckedChangeListener((compoundButton, b) ->
-                                appDatabase.setPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS,
-                                        compoundButton.isChecked()));
-                        checkbox_images.setOnCheckedChangeListener((compoundButton, b) ->
-                                appDatabase.setPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES,
-                                        compoundButton.isChecked()));
-
-                        ad.cancel();
-                        myBuilder.show();
-                        break;
-                }
-            });
-
-            ad.show();
-            return true;
+            }
         });
 
         listView.setItemChecked(0, appDatabase.getAllEnabled()); //"Select all" button

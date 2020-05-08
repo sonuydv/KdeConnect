@@ -175,10 +175,13 @@ public class BackgroundService extends Service {
     }
 
     private void cleanDevices() {
-        new Thread(() -> {
-            for (Device d : devices.values()) {
-                if (!d.isPaired() && !d.isPairRequested() && !d.isPairRequestedByPeer() && !d.deviceShouldBeKeptAlive()) {
-                    d.disconnect();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (Device d : devices.values()) {
+                    if (!d.isPaired() && !d.isPairRequested() && !d.isPairRequestedByPeer() && !d.deviceShouldBeKeptAlive()) {
+                        d.disconnect();
+                    }
                 }
             }
         }).start();
@@ -445,40 +448,46 @@ public class BackgroundService extends Service {
     }
 
     public static void RunCommand(final Context c, final InstanceCallback callback) {
-        new Thread(() -> {
-            if (callback != null) {
-                mutex.lock();
-                try {
-                    callbacks.add(callback);
-                } finally {
-                    mutex.unlock();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (callback != null) {
+                    mutex.lock();
+                    try {
+                        callbacks.add(callback);
+                    } finally {
+                        mutex.unlock();
+                    }
                 }
-            }
-            Intent serviceIntent = new Intent(c, BackgroundService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                c.startForegroundService(serviceIntent);
-            } else {
-                c.startService(serviceIntent);
+                Intent serviceIntent = new Intent(c, BackgroundService.class);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    c.startForegroundService(serviceIntent);
+                } else {
+                    c.startService(serviceIntent);
+                }
             }
         }).start();
     }
 
     public static <T extends Plugin> void RunWithPlugin(final Context c, final String deviceId, final Class<T> pluginClass, final PluginCallback<T> cb) {
-        RunCommand(c, service -> {
-            Device device = service.getDevice(deviceId);
+        RunCommand(c, new InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                Device device = service.getDevice(deviceId);
 
-            if (device == null) {
-                Log.e("BackgroundService", "Device " + deviceId + " not found");
-                return;
+                if (device == null) {
+                    Log.e("BackgroundService", "Device " + deviceId + " not found");
+                    return;
+                }
+
+                final T plugin = device.getPlugin(pluginClass);
+
+                if (plugin == null) {
+                    Log.e("BackgroundService", "Device " + device.getName() + " does not have plugin " + pluginClass.getName());
+                    return;
+                }
+                cb.run(plugin);
             }
-
-            final T plugin = device.getPlugin(pluginClass);
-
-            if (plugin == null) {
-                Log.e("BackgroundService", "Device " + device.getName() + " does not have plugin " + pluginClass.getName());
-                return;
-            }
-            cb.run(plugin);
         });
     }
 }

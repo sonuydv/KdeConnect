@@ -77,7 +77,12 @@ public class PairingDeviceItem implements ListAdapter.Item {
             v.findViewById(R.id.list_item_entry_summary).setVisibility(View.GONE);
         }
 
-        v.setOnClickListener(v1 -> callback.pairingClicked(device));
+        v.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v1) {
+                callback.pairingClicked(device);
+            }
+        });
 
         return v;
     }

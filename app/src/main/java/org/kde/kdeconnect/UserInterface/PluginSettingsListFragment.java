@@ -85,31 +85,39 @@ public class PluginSettingsListFragment extends PreferenceFragmentCompat {
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        PreferenceScreen preferenceScreen = getPreferenceManager().createPreferenceScreen(requireContext());
+        final PreferenceScreen preferenceScreen = getPreferenceManager().createPreferenceScreen(requireContext());
         setPreferenceScreen(preferenceScreen);
 
         final String deviceId = getArguments().getString(ARG_DEVICE_ID);
 
-        BackgroundService.RunCommand(requireContext(), service -> {
-            final Device device = service.getDevice(deviceId);
-            if (device == null) {
-                final FragmentActivity activity = requireActivity();
-                activity.runOnUiThread(activity::finish);
-                return;
-            }
-            List<String> plugins = device.getSupportedPlugins();
+        BackgroundService.RunCommand(requireContext(), new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                final Device device = service.getDevice(deviceId);
+                if (device == null) {
+                    final FragmentActivity activity = PluginSettingsListFragment.this.requireActivity();
+                    activity.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            activity.finish();
+                        }
+                    });
+                    return;
+                }
+                List<String> plugins = device.getSupportedPlugins();
 
-            for (final String pluginKey : plugins) {
-                //TODO: Use PreferenceManagers context
-                PluginPreference pref = new PluginPreference(requireContext(), pluginKey, device, callback);
-                preferenceScreen.addPreference(pref);
+                for (final String pluginKey : plugins) {
+                    //TODO: Use PreferenceManagers context
+                    PluginPreference pref = new PluginPreference(PluginSettingsListFragment.this.requireContext(), pluginKey, device, callback);
+                    preferenceScreen.addPreference(pref);
+                }
             }
         });
     }
 
     @Override
     protected RecyclerView.Adapter onCreateAdapter(PreferenceScreen preferenceScreen) {
-        RecyclerView.Adapter adapter = super.onCreateAdapter(preferenceScreen);
+        final RecyclerView.Adapter adapter = super.onCreateAdapter(preferenceScreen);
 
         /*
             The layoutmanager's state (e.g. scroll position) can only be restored when the recyclerView's

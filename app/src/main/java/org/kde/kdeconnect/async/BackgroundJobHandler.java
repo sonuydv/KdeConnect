@@ -172,6 +172,6 @@ public class BackgroundJobHandler {
     }
 
     public static BackgroundJobHandler newFixedThreadPoolBackgroundJobHander(int numThreads) {
-        return new BackgroundJobHandler(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+        return new BackgroundJobHandler(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
     }
 }

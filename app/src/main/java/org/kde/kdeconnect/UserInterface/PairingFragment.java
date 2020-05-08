@@ -91,7 +91,12 @@ public class PairingFragment extends Fragment implements PairingDeviceItem.Callb
         View listRootView = rootView.findViewById(R.id.devices_list);
         mSwipeRefreshLayout = rootView.findViewById(R.id.refresh_list_layout);
         mSwipeRefreshLayout.setOnRefreshListener(
-                this::updateComputerListAction
+                new SwipeRefreshLayout.OnRefreshListener() {
+                    @Override
+                    public void onRefresh() {
+                        PairingFragment.this.updateComputerListAction();
+                    }
+                }
         );
 
         notTrustedText = (TextView) inflater.inflate(R.layout.pairing_explanation_not_trusted, null);
@@ -101,8 +106,11 @@ public class PairingFragment extends Fragment implements PairingDeviceItem.Callb
         headerText.setOnClickListener(null);
         headerText.setOnLongClickListener(null);
         noWifiHeader = (TextView) inflater.inflate(R.layout.pairing_explanation_text_no_wifi, null);
-        noWifiHeader.setOnClickListener(view -> {
-            startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
+        noWifiHeader.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                PairingFragment.this.startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
+            }
         });
         ((ListView) listRootView).addHeaderView(headerText);
 
@@ -148,124 +156,155 @@ public class PairingFragment extends Fragment implements PairingDeviceItem.Callb
 
     private void updateComputerListAction() {
         updateDeviceList();
-        BackgroundService.RunCommand(mActivity, BackgroundService::onNetworkChange);
-        mSwipeRefreshLayout.setRefreshing(true);
-        new Thread(() -> {
-            try {
-                Thread.sleep(1500);
-            } catch (InterruptedException ignored) {
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService backgroundService) {
+                backgroundService.onNetworkChange();
             }
-            mActivity.runOnUiThread(() -> mSwipeRefreshLayout.setRefreshing(false));
+        });
+        mSwipeRefreshLayout.setRefreshing(true);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ignored) {
+                }
+                mActivity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSwipeRefreshLayout.setRefreshing(false);
+                    }
+                });
+            }
         }).start();
     }
 
     private void updateDeviceList() {
-        BackgroundService.RunCommand(mActivity, service -> mActivity.runOnUiThread(() -> {
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(final BackgroundService service) {
+                mActivity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
 
-            if (!isAdded()) {
-                //Fragment is not attached to an activity. We will crash if we try to do anything here.
-                return;
-            }
+                        if (!PairingFragment.this.isAdded()) {
+                            //Fragment is not attached to an activity. We will crash if we try to do anything here.
+                            return;
+                        }
 
-            if (listRefreshCalledThisFrame) {
-                // This makes sure we don't try to call list.getFirstVisiblePosition()
-                // twice per frame, because the second time the list hasn't been drawn
-                // yet and it would always return 0.
-                return;
-            }
-            listRefreshCalledThisFrame = true;
+                        if (listRefreshCalledThisFrame) {
+                            // This makes sure we don't try to call list.getFirstVisiblePosition()
+                            // twice per frame, because the second time the list hasn't been drawn
+                            // yet and it would always return 0.
+                            return;
+                        }
+                        listRefreshCalledThisFrame = true;
 
-            Collection<Device> devices = service.getDevices().values();
-            boolean someDevicesReachable = false;
-            for (Device device : devices) {
-                if (device.isReachable()) {
-                    someDevicesReachable = true;
-                }
-            }
+                        Collection<Device> devices = service.getDevices().values();
+                        boolean someDevicesReachable = false;
+                        for (Device device : devices) {
+                            if (device.isReachable()) {
+                                someDevicesReachable = true;
+                            }
+                        }
 
-            ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(headerText);
-            ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(noWifiHeader);
-            ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(notTrustedText);
-            ConnectivityManager connManager = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-            NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-            //Check if we're on Wi-Fi. If we still see a device, don't do anything special
-            if (someDevicesReachable || wifi.isConnected()) {
-                if (TrustedNetworkHelper.isTrustedNetwork(getContext())) {
-                    ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(headerText);
-                } else {
-                    ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(notTrustedText);
-                }
-            } else {
-                ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(noWifiHeader);
-            }
+                        ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(headerText);
+                        ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(noWifiHeader);
+                        ((ListView) rootView.findViewById(R.id.devices_list)).removeHeaderView(notTrustedText);
+                        ConnectivityManager connManager = (ConnectivityManager) PairingFragment.this.getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+                        NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                        //Check if we're on Wi-Fi. If we still see a device, don't do anything special
+                        if (someDevicesReachable || wifi.isConnected()) {
+                            if (TrustedNetworkHelper.isTrustedNetwork(PairingFragment.this.getContext())) {
+                                ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(headerText);
+                            } else {
+                                ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(notTrustedText);
+                            }
+                        } else {
+                            ((ListView) rootView.findViewById(R.id.devices_list)).addHeaderView(noWifiHeader);
+                        }
 
-            try {
-                final ArrayList<ListAdapter.Item> items = new ArrayList<>();
+                        try {
+                            final ArrayList<ListAdapter.Item> items = new ArrayList<>();
 
-                SectionItem connectedSection;
-                Resources res = getResources();
+                            SectionItem connectedSection;
+                            Resources res = PairingFragment.this.getResources();
 
-                connectedSection = new SectionItem(res.getString(R.string.category_connected_devices));
-                items.add(connectedSection);
-                for (Device device : devices) {
-                    if (device.isReachable() && device.isPaired()) {
-                        items.add(new PairingDeviceItem(device, PairingFragment.this));
-                        connectedSection.isEmpty = false;
+                            connectedSection = new SectionItem(res.getString(R.string.category_connected_devices));
+                            items.add(connectedSection);
+                            for (Device device : devices) {
+                                if (device.isReachable() && device.isPaired()) {
+                                    items.add(new PairingDeviceItem(device, PairingFragment.this));
+                                    connectedSection.isEmpty = false;
+                                }
+                            }
+                            if (connectedSection.isEmpty) {
+                                items.remove(items.size() - 1); //Remove connected devices section if empty
+                            }
+
+                            SectionItem availableSection = new SectionItem(res.getString(R.string.category_not_paired_devices));
+                            items.add(availableSection);
+                            for (Device device : devices) {
+                                if (device.isReachable() && !device.isPaired()) {
+                                    items.add(new PairingDeviceItem(device, PairingFragment.this));
+                                    availableSection.isEmpty = false;
+                                }
+                            }
+                            if (availableSection.isEmpty && !connectedSection.isEmpty) {
+                                items.remove(items.size() - 1); //Remove remembered devices section if empty
+                            }
+
+                            SectionItem rememberedSection = new SectionItem(res.getString(R.string.category_remembered_devices));
+                            items.add(rememberedSection);
+                            for (Device device : devices) {
+                                if (!device.isReachable() && device.isPaired()) {
+                                    items.add(new PairingDeviceItem(device, PairingFragment.this));
+                                    rememberedSection.isEmpty = false;
+                                }
+                            }
+                            if (rememberedSection.isEmpty) {
+                                items.remove(items.size() - 1); //Remove remembered devices section if empty
+                            }
+
+                            final ListView list = rootView.findViewById(R.id.devices_list);
+
+                            //Store current scroll
+                            int index = list.getFirstVisiblePosition();
+                            View v = list.getChildAt(0);
+                            int top = (v == null) ? 0 : (v.getTop() - list.getPaddingTop());
+
+                            list.setAdapter(new ListAdapter(mActivity, items));
+
+                            //Restore scroll
+                            list.setSelectionFromTop(index, top);
+                        } catch (IllegalStateException e) {
+                            //Ignore: The activity was closed while we were trying to update it
+                        } finally {
+                            listRefreshCalledThisFrame = false;
+                        }
+
                     }
-                }
-                if (connectedSection.isEmpty) {
-                    items.remove(items.size() - 1); //Remove connected devices section if empty
-                }
-
-                SectionItem availableSection = new SectionItem(res.getString(R.string.category_not_paired_devices));
-                items.add(availableSection);
-                for (Device device : devices) {
-                    if (device.isReachable() && !device.isPaired()) {
-                        items.add(new PairingDeviceItem(device, PairingFragment.this));
-                        availableSection.isEmpty = false;
-                    }
-                }
-                if (availableSection.isEmpty && !connectedSection.isEmpty) {
-                    items.remove(items.size() - 1); //Remove remembered devices section if empty
-                }
-
-                SectionItem rememberedSection = new SectionItem(res.getString(R.string.category_remembered_devices));
-                items.add(rememberedSection);
-                for (Device device : devices) {
-                    if (!device.isReachable() && device.isPaired()) {
-                        items.add(new PairingDeviceItem(device, PairingFragment.this));
-                        rememberedSection.isEmpty = false;
-                    }
-                }
-                if (rememberedSection.isEmpty) {
-                    items.remove(items.size() - 1); //Remove remembered devices section if empty
-                }
-
-                final ListView list = rootView.findViewById(R.id.devices_list);
-
-                //Store current scroll
-                int index = list.getFirstVisiblePosition();
-                View v = list.getChildAt(0);
-                int top = (v == null) ? 0 : (v.getTop() - list.getPaddingTop());
-
-                list.setAdapter(new ListAdapter(mActivity, items));
-
-                //Restore scroll
-                list.setSelectionFromTop(index, top);
-            } catch (IllegalStateException e) {
-                //Ignore: The activity was closed while we were trying to update it
-            } finally {
-                listRefreshCalledThisFrame = false;
+                });
             }
-
-    }));
+        });
 }
 
     @Override
     public void onStart() {
         super.onStart();
         mSwipeRefreshLayout.setEnabled(true);
-        BackgroundService.RunCommand(mActivity, service -> service.addDeviceListChangedCallback("PairingFragment", this::updateDeviceList));
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                service.addDeviceListChangedCallback("PairingFragment", new BackgroundService.DeviceListChangedCallback() {
+                    @Override
+                    public void onDeviceListChanged() {
+                        PairingFragment.this.updateDeviceList();
+                    }
+                });
+            }
+        });
         updateDeviceList();
     }
 
@@ -273,7 +312,12 @@ public class PairingFragment extends Fragment implements PairingDeviceItem.Callb
     public void onStop() {
         super.onStop();
         mSwipeRefreshLayout.setEnabled(false);
-        BackgroundService.RunCommand(mActivity, service -> service.removeDeviceListChangedCallback("PairingFragment"));
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                service.removeDeviceListChangedCallback("PairingFragment");
+            }
+        });
     }
 
     @Override

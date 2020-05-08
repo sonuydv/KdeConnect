@@ -20,6 +20,7 @@
 
 package org.kde.kdeconnect.Plugins.NotificationsPlugin;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Notification;
@@ -135,11 +136,14 @@ public class NotificationsPlugin extends Plugin implements NotificationReceiver.
 
         appDatabase = new AppDatabase(context, true);
 
-        NotificationReceiver.RunCommand(context, service -> {
+        NotificationReceiver.RunCommand(context, new NotificationReceiver.InstanceCallback() {
+            @Override
+            public void onServiceStart(NotificationReceiver service) {
 
-            service.addListener(NotificationsPlugin.this);
+                service.addListener(NotificationsPlugin.this);
 
-            serviceReady = service.isConnected();
+                serviceReady = service.isConnected();
+            }
         });
 
         return true;
@@ -148,7 +152,12 @@ public class NotificationsPlugin extends Plugin implements NotificationReceiver.
     @Override
     public void onDestroy() {
 
-        NotificationReceiver.RunCommand(context, service -> service.removeListener(NotificationsPlugin.this));
+        NotificationReceiver.RunCommand(context, new NotificationReceiver.InstanceCallback() {
+            @Override
+            public void onServiceStart(NotificationReceiver service) {
+                service.removeListener(NotificationsPlugin.this);
+            }
+        });
     }
 
     @Override
@@ -281,6 +290,7 @@ public class NotificationsPlugin extends Plugin implements NotificationReceiver.
         return extractStringFromExtra(extras, NotificationCompat.EXTRA_TEXT);
     }
 
+    @SuppressLint("NewApi")
     @NonNull
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
     private static Bundle getExtras(Notification notification) {
@@ -331,7 +341,7 @@ public class NotificationsPlugin extends Plugin implements NotificationReceiver.
             return null;
         }
 
-        actions.put(key, new LinkedList<>());
+        actions.put(key, new LinkedList<Notification.Action>());
         JSONArray jsonArray = new JSONArray();
 
         for (Notification.Action action : notification.actions) {
@@ -549,13 +559,23 @@ public class NotificationsPlugin extends Plugin implements NotificationReceiver.
         } else if (np.getBoolean("request")) {
 
             if (serviceReady) {
-                NotificationReceiver.RunCommand(context, this::sendCurrentNotifications);
+                NotificationReceiver.RunCommand(context, new NotificationReceiver.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(NotificationReceiver service) {
+                        NotificationsPlugin.this.sendCurrentNotifications(service);
+                    }
+                });
             }
 
         } else if (np.has("cancel")) {
             final String dismissedId = np.getString("cancel");
             currentNotifications.remove(dismissedId);
-            NotificationReceiver.RunCommand(context, service -> cancelNotificationCompat(service, dismissedId));
+            NotificationReceiver.RunCommand(context, new NotificationReceiver.InstanceCallback() {
+                @Override
+                public void onServiceStart(NotificationReceiver service) {
+                    cancelNotificationCompat(service, dismissedId);
+                }
+            });
         } else if (np.has("requestReplyId") && np.has("message")) {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {

@@ -19,6 +19,8 @@
  */
 package org.kde.kdeconnect.UserInterface.List;
 
+import android.view.View;
+
 import org.kde.kdeconnect.Plugins.Plugin;
 
 public class FailedPluginListItem extends SmallEntryItem {
@@ -27,7 +29,12 @@ public class FailedPluginListItem extends SmallEntryItem {
         void action(Plugin plugin);
     }
 
-    public FailedPluginListItem(Plugin plugin, Action action) {
-        super(plugin.getDisplayName(),  (view) -> action.action(plugin));
+    public FailedPluginListItem(final Plugin plugin, final Action action) {
+        super(plugin.getDisplayName(), new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                action.action(plugin);
+            }
+        });
     }
 }

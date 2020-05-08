@@ -22,6 +22,7 @@
 package org.kde.kdeconnect.Plugins.BigscreenPlugin;
 
 import android.os.Bundle;
+import android.view.View;
 
 import org.kde.kdeconnect.BackgroundService;
 import org.kde.kdeconnect.UserInterface.ThemeUtil;
@@ -40,14 +41,52 @@ public class BigscreenActivity extends AppCompatActivity {
 
         final String deviceId = getIntent().getStringExtra("deviceId");
 
-        BackgroundService.RunWithPlugin(this, deviceId, org.kde.kdeconnect.Plugins.BigscreenPlugin.BigscreenPlugin.class, plugin -> runOnUiThread(() -> {
-            findViewById(R.id.left_button).setOnClickListener(v -> plugin.sendLeft());
-            findViewById(R.id.right_button).setOnClickListener(v -> plugin.sendRight());
-            findViewById(R.id.up_button).setOnClickListener(v -> plugin.sendUp());
-            findViewById(R.id.down_button).setOnClickListener(v -> plugin.sendDown());
-            findViewById(R.id.select_button).setOnClickListener(v -> plugin.sendSelect());
-            findViewById(R.id.home_button).setOnClickListener(v -> plugin.sendHome());
-        }));
+        BackgroundService.RunWithPlugin(this, deviceId, org.kde.kdeconnect.Plugins.BigscreenPlugin.BigscreenPlugin.class, new BackgroundService.PluginCallback<BigscreenPlugin>() {
+            @Override
+            public void run(final BigscreenPlugin plugin) {
+                BigscreenActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        BigscreenActivity.this.findViewById(R.id.left_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendLeft();
+                            }
+                        });
+                        BigscreenActivity.this.findViewById(R.id.right_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendRight();
+                            }
+                        });
+                        BigscreenActivity.this.findViewById(R.id.up_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendUp();
+                            }
+                        });
+                        BigscreenActivity.this.findViewById(R.id.down_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendDown();
+                            }
+                        });
+                        BigscreenActivity.this.findViewById(R.id.select_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendSelect();
+                            }
+                        });
+                        BigscreenActivity.this.findViewById(R.id.home_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendHome();
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
 }
 

@@ -75,17 +75,20 @@ public class DeviceHelper {
     }
 
     private static void backgroundFetchDeviceName(final Context context) {
-        DeviceName.with(context).request((info, error) -> {
-            fetchingName = false;
-            if (error != null) {
-                Log.e("DeviceHelper", "Error fetching device name");
-                error.printStackTrace();
-            }
-            if (info != null) {
-                String deviceName = info.getName();
-                Log.i("DeviceHelper", "Got device name: " + deviceName);
-                // Update the shared preference. Places that display the name should be listening to this change and update it
-                setDeviceName(context, deviceName);
+        DeviceName.with(context).request(new DeviceName.Callback() {
+            @Override
+            public void onFinished(DeviceName.DeviceInfo info, Exception error) {
+                fetchingName = false;
+                if (error != null) {
+                    Log.e("DeviceHelper", "Error fetching device name");
+                    error.printStackTrace();
+                }
+                if (info != null) {
+                    String deviceName = info.getName();
+                    Log.i("DeviceHelper", "Got device name: " + deviceName);
+                    // Update the shared preference. Places that display the name should be listening to this change and update it
+                    setDeviceName(context, deviceName);
+                }
             }
         });
     }

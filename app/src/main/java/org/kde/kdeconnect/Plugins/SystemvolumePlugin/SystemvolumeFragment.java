@@ -58,15 +58,23 @@ public class SystemvolumeFragment extends ListFragment implements Sink.UpdateLis
         // Don't set progress while the slider is moved
         if (!tracking) {
 
-            activity.runOnUiThread(() -> adapter.notifyDataSetChanged());
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    adapter.notifyDataSetChanged();
+                }
+            });
         }
     }
 
     public void connectToPlugin(final String deviceId) {
-        BackgroundService.RunWithPlugin(activity, deviceId, SystemVolumePlugin.class, plugin -> {
-            this.plugin = plugin;
-            plugin.addSinkListener(SystemvolumeFragment.this);
-            plugin.requestSinkList();
+        BackgroundService.RunWithPlugin(activity, deviceId, SystemVolumePlugin.class, new BackgroundService.PluginCallback<SystemVolumePlugin>() {
+            @Override
+            public void run(SystemVolumePlugin plugin) {
+                SystemvolumeFragment.this.plugin = plugin;
+                plugin.addSinkListener(SystemvolumeFragment.this);
+                plugin.requestSinkList();
+            }
         });
     }
 
@@ -84,9 +92,12 @@ public class SystemvolumeFragment extends ListFragment implements Sink.UpdateLis
             sink.addListener(SystemvolumeFragment.this);
         }
 
-        activity.runOnUiThread(() -> {
-            adapter = new SinkAdapter(context, plugin.getSinks().toArray(new Sink[0]));
-            setListAdapter(adapter);
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                adapter = new SinkAdapter(context, plugin.getSinks().toArray(new Sink[0]));
+                SystemvolumeFragment.this.setListAdapter(adapter);
+            }
         });
     }
 
@@ -131,7 +142,12 @@ public class SystemvolumeFragment extends ListFragment implements Sink.UpdateLis
 
         @Override
         public void onProgressChanged(final SeekBar seekBar, int i, boolean b) {
-            BackgroundService.RunCommand(activity, service -> plugin.sendVolume(sink.getName(), seekBar.getProgress()));
+            BackgroundService.RunCommand(activity, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    plugin.sendVolume(sink.getName(), seekBar.getProgress());
+                }
+            });
         }
 
         @Override
@@ -142,7 +158,12 @@ public class SystemvolumeFragment extends ListFragment implements Sink.UpdateLis
         @Override
         public void onStopTrackingTouch(final SeekBar seekBar) {
             tracking = false;
-            BackgroundService.RunCommand(activity, service -> plugin.sendVolume(sink.getName(), seekBar.getProgress()));
+            BackgroundService.RunCommand(activity, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    plugin.sendVolume(sink.getName(), seekBar.getProgress());
+                }
+            });
         }
 
         @Override

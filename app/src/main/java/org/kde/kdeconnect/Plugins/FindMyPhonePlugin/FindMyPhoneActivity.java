@@ -21,6 +21,7 @@ package org.kde.kdeconnect.Plugins.FindMyPhonePlugin;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -56,7 +57,12 @@ public class FindMyPhoneActivity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
 
-        findViewById(R.id.bFindMyPhone).setOnClickListener(view -> finish());
+        findViewById(R.id.bFindMyPhone).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                FindMyPhoneActivity.this.finish();
+            }
+        });
     }
 
     @Override

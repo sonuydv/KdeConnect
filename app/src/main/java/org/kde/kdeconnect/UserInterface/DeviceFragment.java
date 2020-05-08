@@ -21,12 +21,14 @@
 package org.kde.kdeconnect.UserInterface;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -132,21 +134,24 @@ public class DeviceFragment extends Fragment {
 
         setHasOptionsMenu(true);
 
-        BackgroundService.RunCommand(mActivity, service -> {
-            device = service.getDevice(mDeviceId);
-            if (device == null) {
-                Log.e(TAG, "Trying to display a device fragment but the device is not present");
-                mActivity.onDeviceSelected(null);
-                return;
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                device = service.getDevice(mDeviceId);
+                if (device == null) {
+                    Log.e(TAG, "Trying to display a device fragment but the device is not present");
+                    mActivity.onDeviceSelected(null);
+                    return;
+                }
+
+                mActivity.getSupportActionBar().setTitle(device.getName());
+
+                device.addPairingCallback(pairingCallback);
+                device.addPluginsChangedListener(pluginsChangedListener);
+
+                DeviceFragment.this.refreshUI();
+
             }
-
-            mActivity.getSupportActionBar().setTitle(device.getName());
-
-            device.addPairingCallback(pairingCallback);
-            device.addPluginsChangedListener(pluginsChangedListener);
-
-            refreshUI();
-
         });
 
         return rootView;
@@ -154,17 +159,25 @@ public class DeviceFragment extends Fragment {
 
     String getDeviceId() { return mDeviceId; }
 
-    private final Device.PluginsChangedListener pluginsChangedListener = device -> refreshUI();
+    private final Device.PluginsChangedListener pluginsChangedListener = new Device.PluginsChangedListener() {
+        @Override
+        public void onPluginsChanged(Device device) {
+            DeviceFragment.this.refreshUI();
+        }
+    };
 
     @OnClick(R.id.pair_button)
     void pairButtonClicked(Button pairButton) {
         pairButton.setVisibility(View.GONE);
         pairMessage.setText("");
         pairProgress.setVisibility(View.VISIBLE);
-        BackgroundService.RunCommand(mActivity, service -> {
-            device = service.getDevice(mDeviceId);
-            if (device == null) return;
-            device.requestPairing();
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                device = service.getDevice(mDeviceId);
+                if (device == null) return;
+                device.requestPairing();
+            }
         });
     }
 
@@ -189,11 +202,14 @@ public class DeviceFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        BackgroundService.RunCommand(mActivity, service -> {
-            Device device = service.getDevice(mDeviceId);
-            if (device == null) return;
-            device.removePluginsChangedListener(pluginsChangedListener);
-            device.removePairingCallback(pairingCallback);
+        BackgroundService.RunCommand(mActivity, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                Device device = service.getDevice(mDeviceId);
+                if (device == null) return;
+                device.removePluginsChangedListener(pluginsChangedListener);
+                device.removePairingCallback(pairingCallback);
+            }
         });
 
         unbinder.unbind();
@@ -219,47 +235,64 @@ public class DeviceFragment extends Fragment {
             if (!p.displayInContextMenu()) {
                 continue;
             }
-            menu.add(p.getActionName()).setOnMenuItemClickListener(item -> {
-                p.startMainActivity(mActivity);
-                return true;
+            menu.add(p.getActionName()).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem item) {
+                    p.startMainActivity(mActivity);
+                    return true;
+                }
             });
         }
 
-        menu.add(R.string.device_menu_plugins).setOnMenuItemClickListener(menuItem -> {
-            Intent intent = new Intent(mActivity, PluginSettingsActivity.class);
-            intent.putExtra("deviceId", mDeviceId);
-            startActivity(intent);
-            return true;
+        menu.add(R.string.device_menu_plugins).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+            @Override
+            public boolean onMenuItemClick(MenuItem menuItem) {
+                Intent intent = new Intent(mActivity, PluginSettingsActivity.class);
+                intent.putExtra("deviceId", mDeviceId);
+                DeviceFragment.this.startActivity(intent);
+                return true;
+            }
         });
 
         if (device.isReachable()) {
 
-            menu.add(R.string.encryption_info_title).setOnMenuItemClickListener(menuItem -> {
-                Context context = mActivity;
-                AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                builder.setTitle(context.getResources().getString(R.string.encryption_info_title));
-                builder.setPositiveButton(context.getResources().getString(R.string.ok), (dialog, id) -> dialog.dismiss());
+            menu.add(R.string.encryption_info_title).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    Context context = mActivity;
+                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                    builder.setTitle(context.getResources().getString(R.string.encryption_info_title));
+                    builder.setPositiveButton(context.getResources().getString(R.string.ok), new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int id) {
+                            dialog.dismiss();
+                        }
+                    });
 
-                if (device.certificate == null) {
-                    builder.setMessage(R.string.encryption_info_msg_no_ssl);
-                } else {
-                    builder.setMessage(context.getResources().getString(R.string.my_device_fingerprint) + "\n" + SslHelper.getCertificateHash(SslHelper.certificate) + "\n\n"
-                            + context.getResources().getString(R.string.remote_device_fingerprint) + "\n" + SslHelper.getCertificateHash(device.certificate));
+                    if (device.certificate == null) {
+                        builder.setMessage(R.string.encryption_info_msg_no_ssl);
+                    } else {
+                        builder.setMessage(context.getResources().getString(R.string.my_device_fingerprint) + "\n" + SslHelper.getCertificateHash(SslHelper.certificate) + "\n\n"
+                                + context.getResources().getString(R.string.remote_device_fingerprint) + "\n" + SslHelper.getCertificateHash(device.certificate));
+                    }
+                    builder.show();
+                    return true;
                 }
-                builder.show();
-                return true;
             });
         }
 
         if (device.isPaired()) {
 
-            menu.add(R.string.device_menu_unpair).setOnMenuItemClickListener(menuItem -> {
-                //Remove listener so buttons don't show for a while before changing the view
-                device.removePluginsChangedListener(pluginsChangedListener);
-                device.removePairingCallback(pairingCallback);
-                device.unpair();
-                mActivity.onDeviceSelected(null);
-                return true;
+            menu.add(R.string.device_menu_unpair).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    //Remove listener so buttons don't show for a while before changing the view
+                    device.removePluginsChangedListener(pluginsChangedListener);
+                    device.removePairingCallback(pairingCallback);
+                    device.unpair();
+                    mActivity.onDeviceSelected(null);
+                    return true;
+                }
             });
         }
 
@@ -271,16 +304,19 @@ public class DeviceFragment extends Fragment {
 
         getView().setFocusableInTouchMode(true);
         getView().requestFocus();
-        getView().setOnKeyListener((v, keyCode, event) -> {
-            if (event.getAction() == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_BACK) {
-                boolean fromDeviceList = getArguments().getBoolean(ARG_FROM_DEVICE_LIST, false);
-                // Handle back button so we go to the list of devices in case we came from there
-                if (fromDeviceList) {
-                    mActivity.onDeviceSelected(null);
-                    return true;
+        getView().setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (event.getAction() == KeyEvent.ACTION_UP && keyCode == KeyEvent.KEYCODE_BACK) {
+                    boolean fromDeviceList = DeviceFragment.this.getArguments().getBoolean(ARG_FROM_DEVICE_LIST, false);
+                    // Handle back button so we go to the list of devices in case we came from there
+                    if (fromDeviceList) {
+                        mActivity.onDeviceSelected(null);
+                        return true;
+                    }
                 }
+                return false;
             }
-            return false;
         });
     }
 
@@ -322,19 +358,30 @@ public class DeviceFragment extends Fragment {
                                 if (!p.hasMainActivity()) continue;
                                 if (p.displayInContextMenu()) continue;
 
-                                pluginListItems.add(new PluginItem(p, v -> p.startMainActivity(mActivity)));
+                                pluginListItems.add(new PluginItem(p, new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View v) {
+                                        p.startMainActivity(mActivity);
+                                    }
+                                }));
                             }
-                            DeviceFragment.this.createPluginsList(device.getPluginsWithoutPermissions(), R.string.plugins_need_permission, (plugin) -> {
-                                DialogFragment dialog = plugin.getPermissionExplanationDialog();
-                                if (dialog != null) {
-                                    dialog.show(getChildFragmentManager(), null);
+                            DeviceFragment.this.createPluginsList(device.getPluginsWithoutPermissions(), R.string.plugins_need_permission, new FailedPluginListItem.Action() {
+                                @Override
+                                public void action(Plugin plugin) {
+                                    DialogFragment dialog = plugin.getPermissionExplanationDialog();
+                                    if (dialog != null) {
+                                        dialog.show(getChildFragmentManager(), null);
+                                    }
                                 }
                             });
-                            DeviceFragment.this.createPluginsList(device.getPluginsWithoutOptionalPermissions(), R.string.plugins_need_optional_permission, (plugin) -> {
-                                DialogFragment dialog = plugin.getOptionalPermissionExplanationDialog();
+                            DeviceFragment.this.createPluginsList(device.getPluginsWithoutOptionalPermissions(), R.string.plugins_need_optional_permission, new FailedPluginListItem.Action() {
+                                @Override
+                                public void action(Plugin plugin) {
+                                    DialogFragment dialog = plugin.getOptionalPermissionExplanationDialog();
 
-                                if (dialog != null) {
-                                    dialog.show(getChildFragmentManager(), null);
+                                    if (dialog != null) {
+                                        dialog.show(getChildFragmentManager(), null);
+                                    }
                                 }
                             });
                         }
@@ -371,25 +418,31 @@ public class DeviceFragment extends Fragment {
 
         @Override
         public void pairingFailed(final String error) {
-            mActivity.runOnUiThread(() -> {
-                if (rootView == null) return;
-                pairMessage.setText(error);
-                pairProgress.setVisibility(View.GONE);
-                pairButton.setVisibility(View.VISIBLE);
-                pairRequestButtons.setVisibility(View.GONE);
-                refreshUI();
+            mActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (rootView == null) return;
+                    pairMessage.setText(error);
+                    pairProgress.setVisibility(View.GONE);
+                    pairButton.setVisibility(View.VISIBLE);
+                    pairRequestButtons.setVisibility(View.GONE);
+                    refreshUI();
+                }
             });
         }
 
         @Override
         public void unpaired() {
-            mActivity.runOnUiThread(() -> {
-                if (rootView == null) return;
-                pairMessage.setText(R.string.device_not_paired);
-                pairProgress.setVisibility(View.GONE);
-                pairButton.setVisibility(View.VISIBLE);
-                pairRequestButtons.setVisibility(View.GONE);
-                refreshUI();
+            mActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (rootView == null) return;
+                    pairMessage.setText(R.string.device_not_paired);
+                    pairProgress.setVisibility(View.GONE);
+                    pairButton.setVisibility(View.VISIBLE);
+                    pairRequestButtons.setVisibility(View.GONE);
+                    refreshUI();
+                }
             });
         }
 

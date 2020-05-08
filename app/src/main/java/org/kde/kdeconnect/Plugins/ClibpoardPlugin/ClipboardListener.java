@@ -67,29 +67,35 @@ public class ClipboardListener {
     private ClipboardListener(final Context ctx) {
         context = ctx;
 
-        new Handler(Looper.getMainLooper()).post(() -> {
-            cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-            listener = () -> {
-                try {
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                listener = new ClipboardManager.OnPrimaryClipChangedListener() {
+                    @Override
+                    public void onPrimaryClipChanged() {
+                        try {
 
-                    ClipData.Item item = cm.getPrimaryClip().getItemAt(0);
-                    String content = item.coerceToText(context).toString();
+                            ClipData.Item item = cm.getPrimaryClip().getItemAt(0);
+                            String content = item.coerceToText(context).toString();
 
-                    if (content.equals(currentContent)) {
-                        return;
+                            if (content.equals(currentContent)) {
+                                return;
+                            }
+                            updateTimestamp = System.currentTimeMillis();
+                            currentContent = content;
+
+                            for (ClipboardObserver observer : observers) {
+                                observer.clipboardChanged(content);
+                            }
+
+                        } catch (Exception e) {
+                            //Probably clipboard was not text
+                        }
                     }
-                    updateTimestamp = System.currentTimeMillis();
-                    currentContent = content;
-
-                    for (ClipboardObserver observer : observers) {
-                        observer.clipboardChanged(content);
-                    }
-
-                } catch (Exception e) {
-                    //Probably clipboard was not text
-                }
-            };
-            cm.addPrimaryClipChangedListener(listener);
+                };
+                cm.addPrimaryClipChangedListener(listener);
+            }
         });
     }
 

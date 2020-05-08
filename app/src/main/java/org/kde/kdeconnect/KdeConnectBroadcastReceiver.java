@@ -39,8 +39,11 @@ public class KdeConnectBroadcastReceiver extends BroadcastReceiver {
         switch (action) {
             case Intent.ACTION_MY_PACKAGE_REPLACED:
                 Log.i("KdeConnect", "MyUpdateReceiver");
-                BackgroundService.RunCommand(context, service -> {
+                BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService service) {
 
+                    }
                 });
                 break;
             case Intent.ACTION_PACKAGE_REPLACED:
@@ -49,27 +52,41 @@ public class KdeConnectBroadcastReceiver extends BroadcastReceiver {
                     Log.i("KdeConnect", "Ignoring, it's not me!");
                     return;
                 }
-                BackgroundService.RunCommand(context, service -> {
+                BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService service) {
 
+                    }
                 });
                 break;
             case Intent.ACTION_BOOT_COMPLETED:
                 Log.i("KdeConnect", "KdeConnectBroadcastReceiver");
-                BackgroundService.RunCommand(context, service -> {
+                BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService service) {
 
+                    }
                 });
                 break;
             case WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION:
             case WifiManager.WIFI_STATE_CHANGED_ACTION:
             case ConnectivityManager.CONNECTIVITY_ACTION:
                 Log.i("KdeConnect", "Connection state changed, trying to connect");
-                BackgroundService.RunCommand(context, service -> {
-                    service.onDeviceListChanged();
-                    service.onNetworkChange();
+                BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService service) {
+                        service.onDeviceListChanged();
+                        service.onNetworkChange();
+                    }
                 });
                 break;
             case Intent.ACTION_SCREEN_ON:
-                BackgroundService.RunCommand(context, BackgroundService::onNetworkChange);
+                BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService backgroundService) {
+                        backgroundService.onNetworkChange();
+                    }
+                });
                 break;
             default:
                 Log.i("BroadcastReceiver", "Ignoring broadcast event: " + intent.getAction());

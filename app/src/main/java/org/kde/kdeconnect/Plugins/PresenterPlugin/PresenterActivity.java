@@ -77,16 +77,18 @@ public class PresenterActivity extends AppCompatActivity implements SensorEventL
         }
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         findViewById(R.id.pointer_button).setVisibility(View.VISIBLE);
-        findViewById(R.id.pointer_button).setOnTouchListener((v, event) -> {
-            if(event.getAction() == MotionEvent.ACTION_DOWN){
-                sensorManager.registerListener(this, sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_GAME);
-                v.performClick(); // The linter complains if this is not called
+        findViewById(R.id.pointer_button).setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    sensorManager.registerListener(PresenterActivity.this, sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_GAME);
+                    v.performClick(); // The linter complains if this is not called
+                } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                    sensorManager.unregisterListener(PresenterActivity.this);
+                    plugin.stopPointer();
+                }
+                return true;
             }
-            else if (event.getAction() == MotionEvent.ACTION_UP) {
-                sensorManager.unregisterListener(this);
-                plugin.stopPointer();
-            }
-            return true;
         });
     }
 
@@ -99,14 +101,32 @@ public class PresenterActivity extends AppCompatActivity implements SensorEventL
 
         final String deviceId = getIntent().getStringExtra("deviceId");
 
-        BackgroundService.RunWithPlugin(this, deviceId, PresenterPlugin.class, plugin -> runOnUiThread(() -> {
-            this.plugin = plugin;
-            findViewById(R.id.next_button).setOnClickListener(v -> plugin.sendNext());
-            findViewById(R.id.previous_button).setOnClickListener(v -> plugin.sendPrevious());
-            if (plugin.isPointerSupported()) {
-                enablePointer();
+        BackgroundService.RunWithPlugin(this, deviceId, PresenterPlugin.class, new BackgroundService.PluginCallback<PresenterPlugin>() {
+            @Override
+            public void run(final PresenterPlugin plugin) {
+                PresenterActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        PresenterActivity.this.plugin = plugin;
+                        PresenterActivity.this.findViewById(R.id.next_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendNext();
+                            }
+                        });
+                        PresenterActivity.this.findViewById(R.id.previous_button).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                plugin.sendPrevious();
+                            }
+                        });
+                        if (plugin.isPointerSupported()) {
+                            PresenterActivity.this.enablePointer();
+                        }
+                    }
+                });
             }
-        }));
+        });
     }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

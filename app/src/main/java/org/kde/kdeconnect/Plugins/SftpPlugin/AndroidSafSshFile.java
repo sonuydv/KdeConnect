@@ -279,7 +279,7 @@ public class AndroidSafSshFile implements SshFile {
 
         final ContentResolver resolver = fileSystemView.context.getContentResolver();
         final Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(documentInfo.uri, DocumentsContract.getDocumentId(documentInfo.uri));
-        final ArrayList<AndroidSafSshFile> results = new ArrayList<>();
+        final ArrayList<SshFile> results = new ArrayList<>();
 
         Cursor c = resolver.query(childrenUri, new String[]
                 { DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null);

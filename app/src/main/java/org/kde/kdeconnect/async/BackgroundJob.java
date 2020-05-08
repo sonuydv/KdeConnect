@@ -60,17 +60,23 @@ public abstract class BackgroundJob<I, R> implements Runnable {
         void onError(@NonNull BackgroundJob job, @NonNull Throwable error);
     }
 
-    protected void reportResult(R result) {
-        backgroundJobHandler.runOnUiThread(() -> {
-            callback.onResult(this, result);
-            backgroundJobHandler.onFinished(this);
+    protected void reportResult(final R result) {
+        backgroundJobHandler.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                callback.onResult(BackgroundJob.this, result);
+                backgroundJobHandler.onFinished(BackgroundJob.this);
+            }
         });
     }
 
-    protected void reportError(@NonNull Throwable error) {
-        backgroundJobHandler.runOnUiThread(() -> {
-            callback.onError(this, error);
-            backgroundJobHandler.onFinished(this);
+    protected void reportError(@NonNull final Throwable error) {
+        backgroundJobHandler.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                callback.onError(BackgroundJob.this, error);
+                backgroundJobHandler.onFinished(BackgroundJob.this);
+            }
         });
     }
 }

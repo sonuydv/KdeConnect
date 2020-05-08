@@ -25,6 +25,8 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
 
 import org.kde.kdeconnect.BackgroundService;
@@ -68,15 +70,28 @@ public class ShareActivity extends AppCompatActivity {
 
     private void updateComputerListAction() {
         updateComputerList();
-        BackgroundService.RunCommand(ShareActivity.this, BackgroundService::onNetworkChange);
+        BackgroundService.RunCommand(ShareActivity.this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService backgroundService) {
+                backgroundService.onNetworkChange();
+            }
+        });
 
         mSwipeRefreshLayout.setRefreshing(true);
-        new Thread(() -> {
-            try {
-                Thread.sleep(1500);
-            } catch (InterruptedException ignored) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ignored) {
+                }
+                ShareActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mSwipeRefreshLayout.setRefreshing(false);
+                    }
+                });
             }
-            runOnUiThread(() -> mSwipeRefreshLayout.setRefreshing(false));
         }).start();
     }
 
@@ -90,34 +105,48 @@ public class ShareActivity extends AppCompatActivity {
             return;
         }
 
-        BackgroundService.RunCommand(this, service -> {
+        BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
 
-            Collection<Device> devices = service.getDevices().values();
-            final ArrayList<Device> devicesList = new ArrayList<>();
-            final ArrayList<ListAdapter.Item> items = new ArrayList<>();
+                Collection<Device> devices = service.getDevices().values();
+                final ArrayList<Device> devicesList = new ArrayList<>();
+                final ArrayList<ListAdapter.Item> items = new ArrayList<>();
 
-            SectionItem section = new SectionItem(getString(R.string.share_to));
-            items.add(section);
+                SectionItem section = new SectionItem(ShareActivity.this.getString(R.string.share_to));
+                items.add(section);
 
-            for (Device d : devices) {
-                if (d.isReachable() && d.isPaired()) {
-                    devicesList.add(d);
-                    items.add(new EntryItem(d.getName()));
-                    section.isEmpty = false;
+                for (Device d : devices) {
+                    if (d.isReachable() && d.isPaired()) {
+                        devicesList.add(d);
+                        items.add(new EntryItem(d.getName()));
+                        section.isEmpty = false;
+                    }
                 }
-            }
 
-            runOnUiThread(() -> {
-                ListView list = findViewById(R.id.devices_list);
-                list.setAdapter(new ListAdapter(ShareActivity.this, items));
-                list.setOnItemClickListener((adapterView, view, i, l) -> {
+                ShareActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        ListView list = ShareActivity.this.findViewById(R.id.devices_list);
+                        list.setAdapter(new ListAdapter(ShareActivity.this, items));
+                        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                            @Override
+                            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
-                    Device device = devicesList.get(i - 1); //NOTE: -1 because of the title!
-                    BackgroundService.RunWithPlugin(this, device.getDeviceId(), SharePlugin.class, plugin -> plugin.share(intent));
-                    finish();
+                                Device device = devicesList.get(i - 1); //NOTE: -1 because of the title!
+                                BackgroundService.RunWithPlugin(ShareActivity.this, device.getDeviceId(), SharePlugin.class, new BackgroundService.PluginCallback<SharePlugin>() {
+                                    @Override
+                                    public void run(SharePlugin plugin) {
+                                        plugin.share(intent);
+                                    }
+                                });
+                                ShareActivity.this.finish();
+                            }
+                        });
+                    }
                 });
-            });
 
+            }
         });
     }
 
@@ -131,7 +160,12 @@ public class ShareActivity extends AppCompatActivity {
         ActionBar actionBar = getSupportActionBar();
         mSwipeRefreshLayout = findViewById(R.id.refresh_list_layout);
         mSwipeRefreshLayout.setOnRefreshListener(
-                this::updateComputerListAction
+                new SwipeRefreshLayout.OnRefreshListener() {
+                    @Override
+                    public void onRefresh() {
+                        ShareActivity.this.updateComputerListAction();
+                    }
+                }
         );
         if (actionBar != null) {
             actionBar.setDisplayOptions(ActionBar.DISPLAY_SHOW_HOME | ActionBar.DISPLAY_SHOW_TITLE | ActionBar.DISPLAY_SHOW_CUSTOM);
@@ -147,15 +181,26 @@ public class ShareActivity extends AppCompatActivity {
         final String deviceId = intent.getStringExtra("deviceId");
 
         if (deviceId != null) {
-            BackgroundService.RunWithPlugin(this, deviceId, SharePlugin.class, plugin -> {
-                plugin.share(intent);
-                finish();
+            BackgroundService.RunWithPlugin(this, deviceId, SharePlugin.class, new BackgroundService.PluginCallback<SharePlugin>() {
+                @Override
+                public void run(SharePlugin plugin) {
+                    plugin.share(intent);
+                    ShareActivity.this.finish();
+                }
             });
         } else {
 
-            BackgroundService.RunCommand(this, service -> {
-                service.onNetworkChange();
-                service.addDeviceListChangedCallback("ShareActivity", this::updateComputerList);
+            BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    service.onNetworkChange();
+                    service.addDeviceListChangedCallback("ShareActivity", new BackgroundService.DeviceListChangedCallback() {
+                        @Override
+                        public void onDeviceListChanged() {
+                            ShareActivity.this.updateComputerList();
+                        }
+                    });
+                }
             });
             updateComputerList();
         }
@@ -164,7 +209,12 @@ public class ShareActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        BackgroundService.RunCommand(this, service -> service.removeDeviceListChangedCallback("ShareActivity"));
+        BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                service.removeDeviceListChangedCallback("ShareActivity");
+            }
+        });
         super.onStop();
     }
 

@@ -178,7 +178,12 @@ public class SharePlugin extends Plugin {
         String text = np.getString("text");
         ClipboardManager cm = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         cm.setText(text);
-        handler.post(() -> Toast.makeText(context, R.string.shareplugin_text_saved, Toast.LENGTH_LONG).show());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, R.string.shareplugin_text_saved, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     @WorkerThread

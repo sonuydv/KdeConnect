@@ -3,9 +3,12 @@ package org.kde.kdeconnect.Plugins.FindMyPhonePlugin;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.util.Log;
 
 import org.kde.kdeconnect.BackgroundService;
+
+import java.util.Objects;
 
 public class FindMyPhoneReceiver extends BroadcastReceiver {
     final static String ACTION_FOUND_IT = "org.kde.kdeconnect.Plugins.FindMyPhonePlugin.foundIt";
@@ -13,12 +16,14 @@ public class FindMyPhoneReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        switch (intent.getAction()) {
-            case ACTION_FOUND_IT:
-                foundIt(context, intent);
-                break;
-            default:
-                Log.d("ShareBroadcastReceiver", "Unhandled Action received: " + intent.getAction());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            switch (Objects.requireNonNull(intent.getAction())) {
+                case ACTION_FOUND_IT:
+                    foundIt(context, intent);
+                    break;
+                default:
+                    Log.d("ShareBroadcastReceiver", "Unhandled Action received: " + intent.getAction());
+            }
         }
     }
 
@@ -30,6 +35,11 @@ public class FindMyPhoneReceiver extends BroadcastReceiver {
 
         String deviceId = intent.getStringExtra(EXTRA_DEVICE_ID);
 
-        BackgroundService.RunWithPlugin(context, deviceId, FindMyPhonePlugin.class, FindMyPhonePlugin::stopPlaying);
+        BackgroundService.RunWithPlugin(context, deviceId, FindMyPhonePlugin.class, new BackgroundService.PluginCallback<FindMyPhonePlugin>() {
+            @Override
+            public void run(FindMyPhonePlugin findMyPhonePlugin) {
+                findMyPhonePlugin.stopPlaying();
+            }
+        });
     }
 }

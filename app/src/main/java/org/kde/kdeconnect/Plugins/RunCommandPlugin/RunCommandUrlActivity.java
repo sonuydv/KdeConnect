@@ -22,40 +22,43 @@ public class RunCommandUrlActivity extends AppCompatActivity {
 
         if (getIntent().getAction() != null) {
             try {
-                Uri uri = getIntent().getData();
-                String deviceId = uri.getPathSegments().get(0);
+                final Uri uri = getIntent().getData();
+                final String deviceId = uri.getPathSegments().get(0);
 
-                BackgroundService.RunCommand(this, service -> {
-                    final Device device = service.getDevice(deviceId);
+                BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                    @Override
+                    public void onServiceStart(BackgroundService service) {
+                        final Device device = service.getDevice(deviceId);
 
-                    if(device == null) {
-                        error(R.string.runcommand_nosuchdevice);
-                        return;
-                    }
+                        if (device == null) {
+                            RunCommandUrlActivity.this.error(R.string.runcommand_nosuchdevice);
+                            return;
+                        }
 
-                    if (!device.isPaired()) {
-                        error(R.string.runcommand_notpaired);
-                        return;
-                    }
+                        if (!device.isPaired()) {
+                            RunCommandUrlActivity.this.error(R.string.runcommand_notpaired);
+                            return;
+                        }
 
-                    if (!device.isReachable()) {
-                        error(R.string.runcommand_notreachable);
-                        return;
-                    }
+                        if (!device.isReachable()) {
+                            RunCommandUrlActivity.this.error(R.string.runcommand_notreachable);
+                            return;
+                        }
 
-                    final RunCommandPlugin plugin = device.getPlugin(RunCommandPlugin.class);
-                    if (plugin == null) {
-                        error(R.string.runcommand_noruncommandplugin);
-                        return;
-                    }
+                        final RunCommandPlugin plugin = device.getPlugin(RunCommandPlugin.class);
+                        if (plugin == null) {
+                            RunCommandUrlActivity.this.error(R.string.runcommand_noruncommandplugin);
+                            return;
+                        }
 
-                    plugin.runCommand(uri.getPathSegments().get(1));
-                    RunCommandUrlActivity.this.finish();
+                        plugin.runCommand(uri.getPathSegments().get(1));
+                        RunCommandUrlActivity.this.finish();
 
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                        Vibrator vibrator = RunCommandUrlActivity.this.getSystemService(Vibrator.class);
-                        if(vibrator != null && vibrator.hasVibrator()) {
-                            vibrator.vibrate(100);
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                            Vibrator vibrator = RunCommandUrlActivity.this.getSystemService(Vibrator.class);
+                            if (vibrator != null && vibrator.hasVibrator()) {
+                                vibrator.vibrate(100);
+                            }
                         }
                     }
                 });

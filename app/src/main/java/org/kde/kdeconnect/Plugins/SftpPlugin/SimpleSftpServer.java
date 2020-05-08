@@ -24,8 +24,10 @@ import android.content.Context;
 import android.util.Log;
 
 import org.apache.sshd.SshServer;
+import org.apache.sshd.common.NamedFactory;
 import org.apache.sshd.common.keyprovider.AbstractKeyPairProvider;
 import org.apache.sshd.common.util.SecurityUtils;
+import org.apache.sshd.server.Command;
 import org.apache.sshd.server.PasswordAuthenticator;
 import org.apache.sshd.server.PublickeyAuthenticator;
 import org.apache.sshd.server.command.ScpCommandFactory;
@@ -95,7 +97,7 @@ class SimpleSftpServer {
         fileSystemFactory = new AndroidFileSystemFactory(context);
         sshd.setFileSystemFactory(fileSystemFactory);
         sshd.setCommandFactory(new ScpCommandFactory());
-        sshd.setSubsystemFactories(Collections.singletonList(new SftpSubsystem.Factory()));
+        sshd.setSubsystemFactories(Collections.<NamedFactory<Command>>singletonList(new SftpSubsystem.Factory()));
 
         keyAuth.deviceKey = device.certificate.getPublicKey();
 

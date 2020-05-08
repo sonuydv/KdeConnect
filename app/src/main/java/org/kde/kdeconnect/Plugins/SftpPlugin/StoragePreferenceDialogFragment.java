@@ -3,6 +3,7 @@ package org.kde.kdeconnect.Plugins.SftpPlugin;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -101,10 +102,13 @@ public class StoragePreferenceDialogFragment extends PreferenceDialogFragmentCom
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         AlertDialog dialog = (AlertDialog) super.onCreateDialog(savedInstanceState);
-        dialog.setOnShowListener(dialog1 -> {
-            AlertDialog alertDialog = (AlertDialog) dialog1;
-            positiveButton = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE);
-            positiveButton.setEnabled(enablePositiveButton);
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dialog1) {
+                AlertDialog alertDialog = (AlertDialog) dialog1;
+                positiveButton = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                positiveButton.setEnabled(enablePositiveButton);
+            }
         });
 
         return dialog;

@@ -89,7 +89,12 @@ public class SendFileActivity extends AppCompatActivity {
                     if (uris.isEmpty()) {
                         Log.w("SendFileActivity", "No files to send?");
                     } else {
-                        BackgroundService.RunWithPlugin(this, mDeviceId, SharePlugin.class, plugin -> plugin.sendUriList(uris));
+                        BackgroundService.RunWithPlugin(this, mDeviceId, SharePlugin.class, new BackgroundService.PluginCallback<SharePlugin>() {
+                            @Override
+                            public void run(SharePlugin plugin) {
+                                plugin.sendUriList(uris);
+                            }
+                        });
                     }
                 }
                 finish();

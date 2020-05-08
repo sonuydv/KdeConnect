@@ -126,7 +126,7 @@ public class AndroidSafFileSystemView implements FileSystemView {
         }
 
         //It's a file under / but not one covered by any Tree
-        return new RootFile(new ArrayList<>(0), userName, false);
+        return new RootFile(new ArrayList<SshFile>(0), userName, false);
     }
 
     public AndroidSafSshFile createAndroidSafSshFile(Uri parentUri, Uri documentUri, String virtualFilename) {

@@ -90,31 +90,37 @@ public class LanLink extends BaseLink {
 
         //Log.e("LanLink", "Start listening");
         //Create a thread to take care of incoming data for the new socket
-        new Thread(() -> {
-            try {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StringsHelper.UTF8));
-                while (true) {
-                    String packet;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(newSocket.getInputStream(), StringsHelper.UTF8));
+                    while (true) {
+                        String packet;
+                        try {
+                            packet = reader.readLine();
+                        } catch (SocketTimeoutException e) {
+                            continue;
+                        }
+                        if (packet == null) {
+                            throw new IOException("End of stream");
+                        }
+                        if (packet.isEmpty()) {
+                            continue;
+                        }
+                        NetworkPacket np = NetworkPacket.unserialize(packet);
+                        LanLink.this.receivedNetworkPacket(np);
+                    }
+                } catch (Exception e) {
+                    Log.i("LanLink", "Socket closed: " + newSocket.hashCode() + ". Reason: " + e.getMessage());
                     try {
-                        packet = reader.readLine();
-                    } catch (SocketTimeoutException e) {
-                        continue;
+                        Thread.sleep(300);
+                    } catch (InterruptedException ignored) {
+                    } // Wait a bit because we might receive a new socket meanwhile
+                    boolean thereIsaANewSocket = (newSocket != socket);
+                    if (!thereIsaANewSocket) {
+                        callback.linkDisconnected(LanLink.this);
                     }
-                    if (packet == null) {
-                        throw new IOException("End of stream");
-                    }
-                    if (packet.isEmpty()) {
-                        continue;
-                    }
-                    NetworkPacket np = NetworkPacket.unserialize(packet);
-                    receivedNetworkPacket(np);
-                }
-            } catch (Exception e) {
-                Log.i("LanLink", "Socket closed: " + newSocket.hashCode() + ". Reason: " + e.getMessage());
-                try { Thread.sleep(300); } catch (InterruptedException ignored) {} // Wait a bit because we might receive a new socket meanwhile
-                boolean thereIsaANewSocket = (newSocket != socket);
-                if (!thereIsaANewSocket) {
-                    callback.linkDisconnected(LanLink.this);
                 }
             }
         }).start();

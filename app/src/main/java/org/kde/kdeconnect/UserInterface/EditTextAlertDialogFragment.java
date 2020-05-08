@@ -21,6 +21,7 @@
 package org.kde.kdeconnect.UserInterface;
 
 import android.app.Dialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 
 import com.google.android.material.textfield.TextInputEditText;
@@ -46,14 +47,17 @@ public class EditTextAlertDialogFragment extends AlertDialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        Dialog dialog = super.onCreateDialog(savedInstanceState);
-        dialog.setOnShowListener(dialogInterface -> {
-            dialog.setOnShowListener(null);
-            ButterKnife.bind(EditTextAlertDialogFragment.this, dialog);
+        final Dialog dialog = super.onCreateDialog(savedInstanceState);
+        dialog.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(DialogInterface dialogInterface) {
+                dialog.setOnShowListener(null);
+                ButterKnife.bind(EditTextAlertDialogFragment.this, dialog);
 
-            textInputLayout.setHintEnabled(true);
-            textInputLayout.setHint(getString(hintResId));
-            editText.setText(text);
+                textInputLayout.setHintEnabled(true);
+                textInputLayout.setHint(EditTextAlertDialogFragment.this.getString(hintResId));
+                editText.setText(text);
+            }
         });
 
         Bundle args = getArguments();

@@ -34,15 +34,18 @@ public class RunCommandWidget extends AppWidgetProvider {
             final String targetCommand = intent.getStringExtra(TARGET_COMMAND);
             final String targetDevice = intent.getStringExtra(TARGET_DEVICE);
 
-            BackgroundService.RunCommand(context, service -> {
-                RunCommandPlugin plugin = service.getDevice(targetDevice).getPlugin(RunCommandPlugin.class);
+            BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    RunCommandPlugin plugin = service.getDevice(targetDevice).getPlugin(RunCommandPlugin.class);
 
-                if (plugin != null) {
-                    try {
+                    if (plugin != null) {
+                        try {
 
-                        plugin.runCommand(targetCommand);
-                    } catch (Exception ex) {
-                        Log.e("RunCommandWidget", "Error running command", ex);
+                            plugin.runCommand(targetCommand);
+                        } catch (Exception ex) {
+                            Log.e("RunCommandWidget", "Error running command", ex);
+                        }
                     }
                 }
             });
@@ -71,18 +74,21 @@ public class RunCommandWidget extends AppWidgetProvider {
 
         if (getCurrentDevice() == null || !getCurrentDevice().isReachable()) {
 
-            BackgroundService.RunCommand(context, service -> {
-                if (service.getDevices().size() > 0)
-                    currentDeviceId = service.getDevices().elements().nextElement().getDeviceId();
+            BackgroundService.RunCommand(context, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    if (service.getDevices().size() > 0)
+                        currentDeviceId = service.getDevices().elements().nextElement().getDeviceId();
 
-                updateWidgetImpl(context);
+                    RunCommandWidget.this.updateWidgetImpl(context);
+                }
             });
         }
 
         updateWidgetImpl(context);
     }
 
-    private void updateWidgetImpl(Context context) {
+    private void updateWidgetImpl(final Context context) {
 
         try {
 
@@ -129,9 +135,12 @@ public class RunCommandWidget extends AppWidgetProvider {
         }
 
         if (BackgroundService.getInstance() != null) {
-            BackgroundService.getInstance().addDeviceListChangedCallback("RunCommandWidget", () -> {
-                Intent updateWidget = new Intent(context, RunCommandWidget.class);
-                context.sendBroadcast(updateWidget);
+            BackgroundService.getInstance().addDeviceListChangedCallback("RunCommandWidget", new BackgroundService.DeviceListChangedCallback() {
+                @Override
+                public void onDeviceListChanged() {
+                    Intent updateWidget = new Intent(context, RunCommandWidget.class);
+                    context.sendBroadcast(updateWidget);
+                }
             });
         }
     }

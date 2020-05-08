@@ -108,27 +108,30 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
         String deviceName = DeviceHelper.getDeviceName(this);
         mNavViewDeviceName.setText(deviceName);
 
-        mNavigationView.setNavigationItemSelectedListener(menuItem -> {
-            mCurrentMenuEntry = menuItem.getItemId();
-            switch (mCurrentMenuEntry) {
-                case MENU_ENTRY_ADD_DEVICE:
-                    mCurrentDevice = null;
-                    preferences.edit().putString(STATE_SELECTED_DEVICE, null).apply();
-                    setContentFragment(new PairingFragment());
-                    break;
-                case MENU_ENTRY_SETTINGS:
-                    mCurrentDevice = null;
-                    preferences.edit().putString(STATE_SELECTED_DEVICE, null).apply();
-                    setContentFragment(new SettingsFragment());
-                    break;
-                default:
-                    String deviceId = mMapMenuToDeviceId.get(menuItem);
-                    onDeviceSelected(deviceId);
-                    break;
-            }
+        mNavigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                mCurrentMenuEntry = menuItem.getItemId();
+                switch (mCurrentMenuEntry) {
+                    case MENU_ENTRY_ADD_DEVICE:
+                        mCurrentDevice = null;
+                        preferences.edit().putString(STATE_SELECTED_DEVICE, null).apply();
+                        MainActivity.this.setContentFragment(new PairingFragment());
+                        break;
+                    case MENU_ENTRY_SETTINGS:
+                        mCurrentDevice = null;
+                        preferences.edit().putString(STATE_SELECTED_DEVICE, null).apply();
+                        MainActivity.this.setContentFragment(new SettingsFragment());
+                        break;
+                    default:
+                        String deviceId = mMapMenuToDeviceId.get(menuItem);
+                        MainActivity.this.onDeviceSelected(deviceId);
+                        break;
+                }
 
-            mDrawerLayout.closeDrawer(mNavigationView);
-            return true;
+                mDrawerLayout.closeDrawer(mNavigationView);
+                return true;
+            }
         });
 
         // Decide which menu entry should be selected at start
@@ -192,21 +195,24 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
         PreferenceManager.getDefaultSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(this);
     }
 
-    private String onPairResultFromNotification(String deviceId, String pairStatus) {
+    private String onPairResultFromNotification(final String deviceId, final String pairStatus) {
         assert(deviceId != null);
 
         if (!pairStatus.equals(PAIRING_PENDING)) {
-            BackgroundService.RunCommand(this, service -> {
-                Device device = service.getDevice(deviceId);
-                if (device == null) {
-                    Log.w("rejectPairing", "Device no longer exists: " + deviceId);
-                    return;
-                }
+            BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    Device device = service.getDevice(deviceId);
+                    if (device == null) {
+                        Log.w("rejectPairing", "Device no longer exists: " + deviceId);
+                        return;
+                    }
 
-                if (pairStatus.equals(PAIRING_ACCEPTED)) {
-                    device.acceptPairing();
-                } else if (pairStatus.equals(PAIRING_REJECTED)) {
-                    device.rejectPairing();
+                    if (pairStatus.equals(PAIRING_ACCEPTED)) {
+                        device.acceptPairing();
+                    } else if (pairStatus.equals(PAIRING_REJECTED)) {
+                        device.rejectPairing();
+                    }
                 }
             });
         }
@@ -247,38 +253,41 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
     }
 
     private void updateDeviceList() {
-        BackgroundService.RunCommand(MainActivity.this, service -> {
+        BackgroundService.RunCommand(MainActivity.this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
 
-            Menu menu = mNavigationView.getMenu();
-            menu.clear();
-            mMapMenuToDeviceId.clear();
+                Menu menu = mNavigationView.getMenu();
+                menu.clear();
+                mMapMenuToDeviceId.clear();
 
-            SubMenu devicesMenu = menu.addSubMenu(R.string.devices);
+                SubMenu devicesMenu = menu.addSubMenu(R.string.devices);
 
-            int id = MENU_ENTRY_DEVICE_FIRST_ID;
-            Collection<Device> devices = service.getDevices().values();
-            for (Device device : devices) {
-                if (device.isReachable() && device.isPaired()) {
-                    MenuItem item = devicesMenu.add(Menu.FIRST, id++, 1, device.getName());
-                    item.setIcon(device.getIcon());
-                    item.setCheckable(true);
-                    mMapMenuToDeviceId.put(item, device.getDeviceId());
+                int id = MENU_ENTRY_DEVICE_FIRST_ID;
+                Collection<Device> devices = service.getDevices().values();
+                for (Device device : devices) {
+                    if (device.isReachable() && device.isPaired()) {
+                        MenuItem item = devicesMenu.add(Menu.FIRST, id++, 1, device.getName());
+                        item.setIcon(device.getIcon());
+                        item.setCheckable(true);
+                        mMapMenuToDeviceId.put(item, device.getDeviceId());
+                    }
                 }
+
+                MenuItem addDeviceItem = devicesMenu.add(Menu.FIRST, MENU_ENTRY_ADD_DEVICE, 1000, R.string.pair_new_device);
+                addDeviceItem.setIcon(R.drawable.ic_action_content_add_circle_outline);
+                addDeviceItem.setCheckable(true);
+
+                MenuItem settingsItem = menu.add(Menu.FIRST, MENU_ENTRY_SETTINGS, 1000, R.string.settings);
+                settingsItem.setIcon(R.drawable.ic_action_settings);
+                settingsItem.setCheckable(true);
+
+                //Ids might have changed
+                if (mCurrentMenuEntry >= MENU_ENTRY_DEVICE_FIRST_ID) {
+                    mCurrentMenuEntry = MainActivity.this.deviceIdToMenuEntryId(mCurrentDevice);
+                }
+                mNavigationView.setCheckedItem(mCurrentMenuEntry);
             }
-
-            MenuItem addDeviceItem = devicesMenu.add(Menu.FIRST, MENU_ENTRY_ADD_DEVICE, 1000, R.string.pair_new_device);
-            addDeviceItem.setIcon(R.drawable.ic_action_content_add_circle_outline);
-            addDeviceItem.setCheckable(true);
-
-            MenuItem settingsItem = menu.add(Menu.FIRST, MENU_ENTRY_SETTINGS, 1000, R.string.settings);
-            settingsItem.setIcon(R.drawable.ic_action_settings);
-            settingsItem.setCheckable(true);
-
-            //Ids might have changed
-            if (mCurrentMenuEntry >= MENU_ENTRY_DEVICE_FIRST_ID) {
-                mCurrentMenuEntry = deviceIdToMenuEntryId(mCurrentDevice);
-            }
-            mNavigationView.setCheckedItem(mCurrentMenuEntry);
         });
     }
 
@@ -286,16 +295,29 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
     @Override
     protected void onStart() {
         super.onStart();
-        BackgroundService.RunCommand(this, service -> {
-            service.onNetworkChange();
-            service.addDeviceListChangedCallback("MainActivity", this::updateDeviceList);
+        BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                service.onNetworkChange();
+                service.addDeviceListChangedCallback("MainActivity", new BackgroundService.DeviceListChangedCallback() {
+                    @Override
+                    public void onDeviceListChanged() {
+                        MainActivity.this.updateDeviceList();
+                    }
+                });
+            }
         });
         updateDeviceList();
     }
 
     @Override
     protected void onStop() {
-        BackgroundService.RunCommand(this, service -> service.removeDeviceListChangedCallback("MainActivity"));
+        BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+            @Override
+            public void onServiceStart(BackgroundService service) {
+                service.removeDeviceListChangedCallback("MainActivity");
+            }
+        });
         super.onStop();
     }
 
@@ -351,9 +373,12 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == RESULT_NEEDS_RELOAD) {
-            BackgroundService.RunCommand(this, service -> {
-                Device device = service.getDevice(mCurrentDevice);
-                device.reloadPluginsFromSettings();
+            BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    Device device = service.getDevice(mCurrentDevice);
+                    device.reloadPluginsFromSettings();
+                }
             });
         } else {
             super.onActivityResult(requestCode, resultCode, data);
@@ -371,9 +396,12 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
         }
         if (grantedPermission) {
             //New permission granted, reload plugins
-            BackgroundService.RunCommand(this, service -> {
-                Device device = service.getDevice(mCurrentDevice);
-                device.reloadPluginsFromSettings();
+            BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService service) {
+                    Device device = service.getDevice(mCurrentDevice);
+                    device.reloadPluginsFromSettings();
+                }
             });
         }
     }
@@ -383,7 +411,12 @@ public class MainActivity extends AppCompatActivity implements SharedPreferences
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if (DeviceHelper.KEY_DEVICE_NAME_PREFERENCE.equals(key)) {
             mNavViewDeviceName.setText(DeviceHelper.getDeviceName(this));
-            BackgroundService.RunCommand(this, BackgroundService::onNetworkChange); //Re-send our identity packet
+            BackgroundService.RunCommand(this, new BackgroundService.InstanceCallback() {
+                @Override
+                public void onServiceStart(BackgroundService backgroundService) {
+                    backgroundService.onNetworkChange();
+                }
+            }); //Re-send our identity packet
         }
     }
 }

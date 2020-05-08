@@ -148,35 +148,41 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
         }
 
         final View decorView = getWindow().getDecorView();
-        decorView.setOnSystemUiVisibilityChangeListener(visibility -> {
-            if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+        decorView.setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
+            @Override
+            public void onSystemUiVisibilityChange(int visibility) {
+                if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
 
-                int fullscreenType = 0;
+                    int fullscreenType = 0;
 
-                fullscreenType |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+                    fullscreenType |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    fullscreenType |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        fullscreenType |= View.SYSTEM_UI_FLAG_FULLSCREEN;
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        fullscreenType |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                    }
+
+                    MousePadActivity.this.getWindow().getDecorView().setSystemUiVisibility(fullscreenType);
                 }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    fullscreenType |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                }
-
-                getWindow().getDecorView().setSystemUiVisibility(fullscreenType);
             }
         });
 
     }
 
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
+    public boolean onCreateOptionsMenu(final Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu_mousepad, menu);
 
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, plugin -> {
-            if (!plugin.isKeyboardEnabled()) {
-                menu.removeItem(R.id.menu_show_keyboard);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin plugin) {
+                if (!plugin.isKeyboardEnabled()) {
+                    menu.removeItem(R.id.menu_show_keyboard);
+                }
             }
         });
 
@@ -201,7 +207,7 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean onTouchEvent(final MotionEvent event) {
         if (mMousePadGestureDetector.onTouchEvent(event)) {
             return true;
         }
@@ -229,18 +235,21 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
                 mCurrentX = event.getX();
                 mCurrentY = event.getY();
 
-                BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, plugin -> {
-                    float deltaX = (mCurrentX - mPrevX) * displayDpiMultiplier * mCurrentSensitivity;
-                    float deltaY = (mCurrentY - mPrevY) * displayDpiMultiplier * mCurrentSensitivity;
+                BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+                    @Override
+                    public void run(MousePadPlugin plugin) {
+                        float deltaX = (mCurrentX - mPrevX) * displayDpiMultiplier * mCurrentSensitivity;
+                        float deltaY = (mCurrentY - mPrevY) * displayDpiMultiplier * mCurrentSensitivity;
 
-                    // Run the mouse delta through the pointer acceleration profile
-                    mPointerAccelerationProfile.touchMoved(deltaX, deltaY, event.getEventTime());
-                    mouseDelta = mPointerAccelerationProfile.commitAcceleratedMouseDelta(mouseDelta);
+                        // Run the mouse delta through the pointer acceleration profile
+                        mPointerAccelerationProfile.touchMoved(deltaX, deltaY, event.getEventTime());
+                        mouseDelta = mPointerAccelerationProfile.commitAcceleratedMouseDelta(mouseDelta);
 
-                    plugin.sendMouseDelta(mouseDelta.x, mouseDelta.y);
+                        plugin.sendMouseDelta(mouseDelta.x, mouseDelta.y);
 
-                    mPrevX = mCurrentX;
-                    mPrevY = mCurrentY;
+                        mPrevX = mCurrentX;
+                        mPrevY = mCurrentY;
+                    }
                 });
                 break;
         }
@@ -300,7 +309,12 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
     @Override
     public void onLongPress(MotionEvent e) {
         getWindow().getDecorView().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, MousePadPlugin::sendSingleHold);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin mousePadPlugin) {
+                mousePadPlugin.sendSingleHold();
+            }
+        });
     }
 
     @Override
@@ -310,13 +324,23 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
 
     @Override
     public boolean onSingleTapConfirmed(MotionEvent e) {
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, MousePadPlugin::sendSingleClick);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin mousePadPlugin) {
+                mousePadPlugin.sendSingleClick();
+            }
+        });
         return true;
     }
 
     @Override
     public boolean onDoubleTap(MotionEvent e) {
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, MousePadPlugin::sendDoubleClick);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin mousePadPlugin) {
+                mousePadPlugin.sendDoubleClick();
+            }
+        });
         return true;
     }
 
@@ -355,15 +379,30 @@ public class MousePadActivity extends AppCompatActivity implements GestureDetect
 
 
     private void sendMiddleClick() {
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, MousePadPlugin::sendMiddleClick);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin mousePadPlugin) {
+                mousePadPlugin.sendMiddleClick();
+            }
+        });
     }
 
     private void sendRightClick() {
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, MousePadPlugin::sendRightClick);
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin mousePadPlugin) {
+                mousePadPlugin.sendRightClick();
+            }
+        });
     }
 
     private void sendScroll(final float y) {
-        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, plugin -> plugin.sendScroll(0, y));
+        BackgroundService.RunWithPlugin(this, deviceId, MousePadPlugin.class, new BackgroundService.PluginCallback<MousePadPlugin>() {
+            @Override
+            public void run(MousePadPlugin plugin) {
+                plugin.sendScroll(0, y);
+            }
+        });
     }
 
     //TODO: Does not work on KitKat with or without requestFocus()

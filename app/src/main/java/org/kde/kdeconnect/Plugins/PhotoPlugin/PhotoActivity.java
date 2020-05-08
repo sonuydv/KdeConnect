@@ -56,13 +56,16 @@ public class PhotoActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    protected void onActivityResult(int requestCode, final int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        BackgroundService.RunWithPlugin(this, getIntent().getStringExtra("deviceId"), PhotoPlugin.class, plugin -> {
-            if (resultCode == -1) {
-                plugin.sendPhoto(photoURI);
-            } else {
-                plugin.sendCancel();
+        BackgroundService.RunWithPlugin(this, getIntent().getStringExtra("deviceId"), PhotoPlugin.class, new BackgroundService.PluginCallback<PhotoPlugin>() {
+            @Override
+            public void run(PhotoPlugin plugin) {
+                if (resultCode == -1) {
+                    plugin.sendPhoto(photoURI);
+                } else {
+                    plugin.sendCancel();
+                }
             }
         });
         finish();

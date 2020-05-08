@@ -120,12 +120,15 @@ public class StoragePreference extends DialogPreference {
 
         checkbox.setVisibility(inSelectionMode ? View.VISIBLE : View.INVISIBLE);
 
-        holder.itemView.setOnLongClickListener(v -> {
-            if (onLongClickListener != null) {
-                onLongClickListener.onLongClick(StoragePreference.this);
-                return true;
+        holder.itemView.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                if (onLongClickListener != null) {
+                    onLongClickListener.onLongClick(StoragePreference.this);
+                    return true;
+                }
+                return false;
             }
-            return false;
         });
     }
 

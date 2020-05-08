@@ -18,7 +18,7 @@ public class PluginPreference extends CheckBoxPreference {
     private final View.OnClickListener listener;
 
     public PluginPreference(@NonNull final Context context, @NonNull final String pluginKey,
-                            @NonNull final Device device, @NonNull PluginPreferenceCallback callback) {
+                            @NonNull final Device device, @NonNull final PluginPreferenceCallback callback) {
         super(context);
 
         setLayoutResource(R.layout.preference_with_button/*R.layout.preference_with_button_androidx*/);
@@ -34,12 +34,15 @@ setIcon(android.R.color.transparent);
 
         Plugin plugin = device.getPlugin(pluginKey);
         if (info.hasSettings() && plugin != null) {
-            this.listener = v -> {
-                Plugin plugin1 = device.getPlugin(pluginKey);
-                if (plugin1 != null) {
-                    callback.onStartPluginSettingsFragment(plugin1);
-                } else { //Could happen if the device is not connected anymore
-                    callback.onFinish();
+            this.listener = new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Plugin plugin1 = device.getPlugin(pluginKey);
+                    if (plugin1 != null) {
+                        callback.onStartPluginSettingsFragment(plugin1);
+                    } else { //Could happen if the device is not connected anymore
+                        callback.onFinish();
+                    }
                 }
             };
         } else {
@@ -61,11 +64,14 @@ setIcon(android.R.color.transparent);
             button.setOnClickListener(listener);
         }
 
-        holder.itemView.setOnClickListener(v -> {
-            boolean newState = !device.isPluginEnabled(pluginKey);
-            setChecked(newState); //It actually works on API<14
-            button.setEnabled(newState);
-            device.setPluginEnabled(pluginKey, newState);
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean newState = !device.isPluginEnabled(pluginKey);
+                PluginPreference.this.setChecked(newState); //It actually works on API<14
+                button.setEnabled(newState);
+                device.setPluginEnabled(pluginKey, newState);
+            }
         });
     }
 

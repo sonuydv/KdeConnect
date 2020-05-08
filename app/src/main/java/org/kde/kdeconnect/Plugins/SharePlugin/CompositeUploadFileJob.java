@@ -187,7 +187,12 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             //Give SharePlugin some time to add more NetworkPackets
             if (isRunning && !updatePacketPending) {
                 updatePacketPending = true;
-                handler.post(this::sendUpdatePacket);
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        CompositeUploadFileJob.this.sendUpdatePacket();
+                    }
+                });
             }
         }
     }

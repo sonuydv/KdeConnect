@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -193,9 +194,14 @@ public class SMSHelper {
         // Suppose we were requested to return N values and suppose a user sends only one MMS per
         // week and N SMS per day. We have requested the same N for each, so if we just return everything
         // we would return some very old MMS messages which would be very confusing.
-        SortedMap<Long, Collection<Message>> sortedMessages = new TreeMap<>((lhs, rhs) -> Long.compare(rhs, lhs));
+        SortedMap<Long, Collection<Message>> sortedMessages = new TreeMap<>(new Comparator<Long>() {
+            @Override
+            public int compare(Long lhs, Long rhs) {
+                return Long.compare(rhs, lhs);
+            }
+        });
         for (Message message : allMessages) {
-            Collection<Message> existingMessages = sortedMessages.getOrDefault(message.date, new ArrayList<>());
+            Collection<Message> existingMessages = sortedMessages.getOrDefault(message.date, new ArrayList<Message>());
             assert existingMessages != null;
             existingMessages.add(message);
             sortedMessages.put(message.date, existingMessages);

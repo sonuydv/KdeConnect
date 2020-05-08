@@ -85,7 +85,12 @@ public class ClipboardPlugin extends Plugin {
         throw new UnsupportedOperationException("Unknown packet type: " + np.getType());
     }
 
-    private final ClipboardListener.ClipboardObserver observer = this::propagateClipboard;
+    private final ClipboardListener.ClipboardObserver observer = new ClipboardListener.ClipboardObserver() {
+        @Override
+        public void clipboardChanged(String content) {
+            ClipboardPlugin.this.propagateClipboard(content);
+        }
+    };
 
     void propagateClipboard(String content) {
         NetworkPacket np = new NetworkPacket(ClipboardPlugin.PACKET_TYPE_CLIPBOARD);

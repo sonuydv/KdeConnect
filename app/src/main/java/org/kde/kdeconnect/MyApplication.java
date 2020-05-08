@@ -12,6 +12,9 @@ public class MyApplication extends Application {
         private boolean inForeground = false;
 
         @Override
+        public void onCreate(@NonNull LifecycleOwner owner) { }
+
+        @Override
         public void onStart(@NonNull LifecycleOwner owner) {
             inForeground = true;
         }
@@ -20,6 +23,15 @@ public class MyApplication extends Application {
         public void onStop(@NonNull LifecycleOwner owner) {
             inForeground = false;
         }
+
+        @Override
+        public void onDestroy(@NonNull LifecycleOwner owner) { }
+
+        @Override
+        public void onPause(@NonNull LifecycleOwner owner) { }
+
+        @Override
+        public void onResume(@NonNull LifecycleOwner owner) { }
 
         boolean isInForeground() {
             return inForeground;

@@ -176,7 +176,12 @@ public class SftpSettingsFragment
     @Override
     protected RecyclerView.Adapter onCreateAdapter(PreferenceScreen preferenceScreen) {
         if (savedActionModeState != null) {
-            getListView().post(this::restoreActionMode);
+            getListView().post(new Runnable() {
+                @Override
+                public void run() {
+                    SftpSettingsFragment.this.restoreActionMode();
+                }
+            });
         }
 
         return super.onCreateAdapter(preferenceScreen);
